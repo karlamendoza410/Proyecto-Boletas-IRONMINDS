@@ -1,0 +1,29 @@
+from abc import ABC, abstractmethod
+
+class ActaBase(ABC):
+    def _init_(self, municipio: str, seccion: int, tipo_casilla: str, total_votos: int):
+        self.municipio = municipio
+        self.seccion = seccion
+        self.tipo_casilla = tipo_casilla
+        self.total_votos = total_votos
+
+    @abstractmethod
+    def validar_acta(self):
+        
+        pass
+
+    @abstractmethod
+    def generar_reporte(self):
+       
+        pass
+
+
+class ActaElectoral(ActaBase):
+    def validar_acta(self):
+        if self.total_votos < 0:
+            return "Error: Los votos no pueden ser negativos."
+        return "Acta válida."
+
+    def generar_reporte(self):
+        return (f"Municipio: {self.municipio} | Sección: {self.seccion} | "
+                f"Casilla: {self.tipo_casilla} | Total: {self.total_votos}")
