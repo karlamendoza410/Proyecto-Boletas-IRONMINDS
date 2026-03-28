@@ -6,12 +6,18 @@ class ActaBase(ABC):
         self.seccion = seccion
         self.tipo_casilla = tipo_casilla
         self.total_votos = total_votos
+        self.firma = firma
 
     @abstractmethod
     def validar_acta(self):
         
         pass
 
+    @abstractmethod
+    def validar_firma(self):
+        
+        pass
+    
     @abstractmethod
     def generar_reporte(self):
        
@@ -27,3 +33,9 @@ class ActaElectoral(ActaBase):
     def generar_reporte(self):
         return (f"Municipio: {self.municipio} | Sección: {self.seccion} | "
                 f"Casilla: {self.tipo_casilla} | Total: {self.total_votos}")
+
+    def validar_firma(self):
+        if self.firma =  True
+            raise ValueError("El acta no contiene todas las firmas necesarias, revisa de nuevo.")
+        return "firma valida"
+    
