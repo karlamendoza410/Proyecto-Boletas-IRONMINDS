@@ -2,16 +2,18 @@ from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from acta import ActaElectoral
 from partidos import Partido
+import os
+import requests
 
 
-def procesar_acta_con_ia(ruta_imagen):
+def procesar_acta_con_ia(ruta):
     
 
     model_id = "Analizador_ACTAS" 
     
-    client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
+    client = DocumentIntelligenceClient(endpoint="", credential = AzureKeyCredential(""))
 
-    with open(ruta_imagen, "rb") as f:
+    with open(ruta, "rb") as f:
         
         poller = client.begin_analyze_document(model_id, body=f, content_type="application/octet-stream")
         result = poller.result()
@@ -51,6 +53,21 @@ def procesar_acta_con_ia(ruta_imagen):
 
 
 if __name__ == "__main__":
-    acta, partidos_extraidos, folio = procesar_acta_con_ia("/Users/axelcorona/Downloads/AYU_5656_003.jpg")
-    print(f"Reporte del Acta {folio}:")
-    print(acta.generar_reporte())
+    url = "https://www.ieem.org.mx/prep2024/actas/AYU_5672_001.jpg"
+    ruta = "acta5672.jpg"
+
+    print("descargando imagen")
+    respuesta = requests.get(url)
+    
+    if respuesta.status_code == 200:
+        with open(ruta, "wb") as archivo:
+            archivo.write(respuesta.content)
+            
+        print("procesando")
+        acta, partidos_extraidos, folio = procesar_acta_con_ia(ruta)
+        
+        print(f"Reporte del Acta {folio}:")
+        print(acta.generar_reporte())
+        os.remove(ruta)
+    else:
+        print("error al descargar imagen")
