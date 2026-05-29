@@ -1,55 +1,103 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
-import requests
+import pandas as pd
+import numpy as np
+import shutil
 import os
-import uuid
-from ia import procesar_acta_con_ia 
+import requests
+import uuid 
 
-app = FastAPI()
+
+from ia import procesar_acta_con_ia
+
+app = FastAPI(title="Sistema de Escrutinio Electoral IA")
+
+
+base_datos_votos = []
 class PeticionImagen(BaseModel):
     url: str
 
-@app.post("/procesar-acta")
-async def procesar(peticion: PeticionImagen):
-    ruta = f"temp_{uuid.uuid4().hex}.jpg"
-    
-    try:
-        print(f"descargando imagen de: {peticion.url}")
-        respuesta_http = requests.get(peticion.url, timeout=15)
-        respuesta_http.raise_for_status() 
-        
-        with open(ruta, "wb") as archivo:
-            archivo.write(respuesta_http.content)
-            
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo descargar la imagen. Verifica la URL. Detalles: {str(e)}")
 
-    try:
-        acta_obj, partidos_extraidos, folio_qr = procesar_acta_con_ia(ruta)
-        
-        diccionario_votos = {}
-        for p in partidos_extraidos:
-            diccionario_votos[p.nombre_partido] = p.votos 
+@app.post("/escanear-acta/")
+async def escanear_acta(datos: PeticionActa):
 
-        respuesta = {
-            "tipo_eleccion": 2, 
-            "distrito": 14, 
-            "municipio": acta_obj.municipio,
-            "seccion": str(acta_obj.seccion).zfill(3),
-            "tipo_casilla": acta_obj.tipo_casilla,
-            "total_votos": acta_obj.total_votos,
-            "votos_partido": diccionario_votos,
-            "votos_nulos": 0, 
-            "qr_data": folio_qr,
-            "fecha_procesamiento": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        }
-        return respuesta
-        
+    ruta_temporal = f"temp_{uuid.uuid64().hex}.jpg"
+    with open(ruta_temporal, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    try:
+        cabeceras = {"user-agent": "mozilla/5.0"}
+        respuesta_http = requests.get(datos.url, headers= cabeceras, timeout=15)
+        respuesta_http.raise_for_status()
+
+        with open(ruta_temporal, "wb") as buffer:
+            buffer.write(respuesta_http.content)
     except Exception as e:
-        print(f"error procesando el acta: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"error interno procesando el acta: {str(e)}")
-        
+        raise HTTPException (status_code=400, detail=f"error al descargar {str(e)}")
     finally:
-        if os.path.exists(ruta):
-            os.remove(ruta)
+        if os.path.exists(ruta_temporal):
+            os.remove(ruta_temporal)
+    try:
+
+        acta, partidos_extraidos, folio = procesar_acta_con_ia(ruta_temporal)
+
+
+        validacion = acta.validar_acta(partidos_extraidos)
+
+        if "Error" in validacion:
+            return {"status": "error", "mensaje": validacion, "folio": folio}
+
+
+        for p in partidos_extraidos:
+            base_datos_votos.append({
+                "folio": folio,
+                "municipio": acta.municipio,
+                "seccion": acta.seccion,
+                "partido": p.nombre_partido,
+                "votos": p.votos
+            })
+
+        return {
+            "status": "ok",
+            "folio": folio,
+            "municipio": acta.municipio,
+            "reporte": acta.generar_reporte(partidos_extraidos)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"error al procesar {str(e)}")
+    
+    finally:
+
+        if os.path.exists(ruta_temporal):
+            os.remove(ruta_temporal)
+
+
+@app.get("/resultados-globales/")
+def obtener_resultados_globales():
+    #pandas numpy
+    if not base_datos_votos:
+        return {"mensaje": "No hay actas procesadas aún."}
+
+
+    df = pd.DataFrame(base_datos_votos)
+
+
+    votos_por_partido = df.groupby("partido")["votos"].sum().reset_index()
+
+
+    total_votos_general = np.sum(votos_por_partido["votos"].values)
+
+    votos_por_partido["porcentaje"] = np.round((votos_por_partido["votos"] / total_votos_general) * 100, 2)
+
+    resultados = votos_por_partido.to_dict(orient="records")
+
+    return {
+        "total_actas_procesadas": len(df["folio"].unique()),
+        "total_votos_emitidos": int(total_votos_general),
+        "conteo_por_partido": resultados
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
