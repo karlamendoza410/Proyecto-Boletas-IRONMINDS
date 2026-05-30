@@ -3,6 +3,7 @@ from azure.core.credentials import AzureKeyCredential
 from acta import ActaElectoral
 from partidos import Partido
 import os
+import re
 import requests
 
 
@@ -33,27 +34,65 @@ def procesar_acta_con_ia(ruta):
     )
 
     partidos_extraidos = []
-
     tabla_ia = campos.get("tabla_resultados")
 
+    ordenPartidos = [
+        "PAN",
+        "Partido Verde",
+        "PT",
+        "Movimiento Ciudadano",
+        "Morena",
+        "Coalición PT-Verde-Morena",
+        "Coalición PT-Verde",
+        "Coalición Verde-Morena",
+        "Coalición PT-Morena",
+        "CANDIDATOS NO REGISTRADOS",
+        "VOTOS NULOS"
+    ]
+
     if tabla_ia and tabla_ia.get('type') == 'array' and 'valueArray' in tabla_ia:
+        indice_partido = 0
+
         for row in tabla_ia['valueArray']:
-       
+            if indice_partido >= len(ordenPartidos):
+                break
+
             obj = row.get('valueObject', {})
-            nombre_field = obj.get('nombre_partido')
             votos_field = obj.get('votos')
 
-            if nombre_field and votos_field:
-                p_nombre = nombre_field.get('valueString', 'Desconocido')
-                votos_raw = votos_field.get('valueString', '0')
-                p_votos = int(votos_raw) if votos_raw.isdigit() else 0
-                partidos_extraidos.append(Partido(p_nombre, p_votos))
+            if not votos_field:
+                continue
+
+            votos_raw = str(votos_field.get('valueString', '')).upper()
+            lineas = votos_raw.split('\n')
+
+            for linea in lineas:
+                if indice_partido >= len(ordenPartidos):
+                    break
+
+                linea = linea.replace('O', '0')
+                votos_limpios = re.sub(r'\D', '', linea)
+
+                if not votos_limpios:
+                    continue
+
+                if len(votos_limpios) > 3:
+                    pedazos = [votos_limpios[i:i+3] for i in range(0, len(votos_limpios), 3)]
+                    for pedazo in pedazos:
+                        if indice_partido >= len(ordenPartidos):
+                            break
+                        partidos_extraidos.append(Partido(ordenPartidos[indice_partido], int(pedazo)))
+                        indice_partido += 1
+                else:
+                    partidos_extraidos.append(Partido(ordenPartidos[indice_partido], int(votos_limpios)))
+                    indice_partido += 1
+        while indice_partido < len(ordenPartidos):
+            partidos_extraidos.append(Partido(ordenPartidos[indice_partido], 0))
+            indice_partido += 1
 
     return nueva_acta, partidos_extraidos, id_qr
-
-
 if __name__ == "__main__":
-    url = "https://www.ieem.org.mx/prep2024/actas/AYU_5672_001.jpg"
+    url = "https://www.ieem.org.mx/prep2024/actas/AYU_5662_002.jpg"
     ruta = "acta5672.jpg"
 
     print("descargando imagen")
