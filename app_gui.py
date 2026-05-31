@@ -97,7 +97,6 @@ async def main(page: ft.Page):
                 for i, item in enumerate(datos["conteo_por_partido"]):
                     color_asignado = colores[i % len(colores)]
                     
-                    # 1. Tabla
                     tabla_resultados.rows.append(
                         ft.DataRow(cells=[
                             ft.DataCell(ft.Text(item["partido"], weight=ft.FontWeight.W_500)),
@@ -256,8 +255,6 @@ async def main(page: ft.Page):
         page.overlay.append(dialogo_reset)
         dialogo_reset.open = True
         page.update()
-
-    # --- Componentes y Botones ---
     btn_cargar = ft.Button(
         content=ft.Row([ft.Icon(ft.Icons.AUTO_AWESOME), ft.Text("Procesar URL")], tight=True),
         on_click=procesar_url_acta,
@@ -269,8 +266,6 @@ async def main(page: ft.Page):
         on_click=confirmar_reset,
         style=ft.ButtonStyle(bgcolor=ft.Colors.RED_50)
     )
-
-    # --- Layout Principal ---
     page.add(
         ft.Row([titulo, ft.IconButton(icon=ft.Icons.REFRESH, icon_color=ft.Colors.BLUE_800, on_click=lambda _: asyncio.create_task(actualizar_dashboard()), tooltip="Sincronizar datos")], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         ft.Divider(height=10, color=ft.Colors.TRANSPARENT),
