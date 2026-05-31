@@ -108,12 +108,6 @@ def reiniciar_conteo():
     base_datos_votos.clear()
     return {"status": "ok", "mensaje": "Base de datos reiniciada con exito"}
 
-@app.delete("/reiniciar-conteo/")
-def reiniciar_conteo():
-    global base_datos_votos 
-    base_datos_votos.clear()
-    return {"status": "ok", "mensaje": "Base de datos reiniciada con exito"}
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
